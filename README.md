@@ -1,0 +1,1 @@
+# plat-scale-detection-model
