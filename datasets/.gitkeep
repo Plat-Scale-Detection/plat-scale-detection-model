@@ -1,0 +1,11 @@
+# Placeholder – datasets are pushed here by the trainer.
+# Directory structure expected by train.py:
+#
+#   datasets/latest/
+#     data.yaml
+#     images/
+#       train/   *.png / *.jpg
+#       val/     *.png / *.jpg
+#     labels/
+#       train/   *.txt  (YOLO format)
+#       val/     *.txt

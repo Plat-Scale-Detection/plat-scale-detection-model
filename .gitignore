@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.eggs/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Model weights (stored as GitHub Release assets, not in git)
+weights/*.pt
+weights/*.onnx
+weights/*.torchscript
+weights/*.engine
+
+# Training runs (large, stored as GitHub Actions artifacts)
+runs/
+
+# Dataset images (pushed by trainer, may be large)
+datasets/latest/images/
+datasets/*/images/
+
+# Patched YAML files generated at runtime
+datasets/**/_data_patched.yaml
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp

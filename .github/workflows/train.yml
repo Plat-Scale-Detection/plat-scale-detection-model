@@ -1,0 +1,86 @@
+name: Train Scale Detection Model
+
+on:
+  # Trigger when trained dataset is pushed to the datasets/ directory
+  push:
+    branches: [main]
+    paths:
+      - "datasets/**"
+      - "config/model_config.yaml"
+  # Allow manual trigger with optional overrides
+  workflow_dispatch:
+    inputs:
+      epochs:
+        description: "Number of training epochs (leave blank to use config default)"
+        required: false
+        default: ""
+      dataset:
+        description: "Dataset path relative to repo root"
+        required: false
+        default: "datasets/latest"
+
+jobs:
+  train:
+    name: Fine-tune YOLOv8
+    runs-on: ubuntu-latest          # swap to a self-hosted GPU runner for real training
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install --no-cache-dir -r requirements.txt
+
+      - name: Validate dataset
+        run: |
+          DATASET="${{ github.event.inputs.dataset || 'datasets/latest' }}"
+          python scripts/import_dataset.py --dir "$DATASET" --name latest
+
+      - name: Train model
+        run: |
+          EPOCHS_ARG=""
+          if [ -n "${{ github.event.inputs.epochs }}" ]; then
+            EPOCHS_ARG="--epochs ${{ github.event.inputs.epochs }}"
+          fi
+          python train.py \
+            --dataset "${{ github.event.inputs.dataset || 'datasets/latest' }}" \
+            --device cpu \
+            $EPOCHS_ARG
+
+      - name: Evaluate model
+        run: |
+          python scripts/evaluate.py \
+            --dataset "${{ github.event.inputs.dataset || 'datasets/latest' }}" \
+            --device cpu
+
+      - name: Upload trained weights
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-weights-${{ github.run_number }}
+          path: weights/
+          retention-days: 90
+
+      - name: Create GitHub Release with weights
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "model-v${{ github.run_number }}"
+          name: "Model weights – run ${{ github.run_number }}"
+          body: |
+            Automatically trained on dataset commit ${{ github.sha }}.
+            Download `best.pt` for inference or `best.onnx` for deployment.
+          files: |
+            weights/best.pt
+            weights/last.pt
+            weights/*.onnx
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

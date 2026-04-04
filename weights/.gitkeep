@@ -1,0 +1,4 @@
+# Trained model weights are stored here.
+# best.pt   – best checkpoint from the most recent training run
+# last.pt   – final checkpoint
+# *.onnx    – exported ONNX model (for deployment)
