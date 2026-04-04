@@ -1,9 +1,9 @@
 name: Train Scale Detection Model
 
 on:
-  # Trigger when trained dataset is pushed to the datasets/ directory
+  # Trigger when the trainer pushes a new dataset to the trainer branch
   push:
-    branches: [main]
+    branches: [trainer]
     paths:
       - "datasets/**"
       - "config/model_config.yaml"
@@ -42,7 +42,21 @@ jobs:
       - name: Validate dataset
         run: |
           DATASET="${{ github.event.inputs.dataset || 'datasets/latest' }}"
-          python scripts/import_dataset.py --dir "$DATASET" --name latest
+          # Data is already present in the checkout; just validate structure.
+          python - <<'EOF'
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, str(Path("scripts")))
+          from import_dataset import validate_dataset, REPO_ROOT
+          import os
+          dest = REPO_ROOT / os.environ["DATASET"]
+          if not dest.exists():
+              print(f"ERROR: Dataset directory not found: {dest}")
+              sys.exit(1)
+          validate_dataset(dest)
+          EOF
+        env:
+          DATASET: "${{ github.event.inputs.dataset || 'datasets/latest' }}"
 
       - name: Train model
         run: |

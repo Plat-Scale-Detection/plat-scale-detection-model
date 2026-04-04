@@ -42,6 +42,11 @@ def import_from_dir(src: Path, dest: Path) -> None:
     if not src.exists():
         raise FileNotFoundError(f"Source directory not found: {src}")
 
+    # If source and destination are the same path, nothing to copy.
+    if src.resolve() == dest.resolve():
+        print(f"Source and destination are the same ({dest}/), skipping copy.")
+        return
+
     print(f"Copying {src} → {dest}/")
     if dest.exists():
         shutil.rmtree(dest)
