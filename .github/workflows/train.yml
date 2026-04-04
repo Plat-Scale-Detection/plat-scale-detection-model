@@ -1,9 +1,10 @@
 name: Train Scale Detection Model
 
 on:
-  # Trigger when the trainer pushes a new dataset to the trainer branch
   push:
-    branches: [trainer]
+    # trainer branch  → pre-release (dataset from annotation tool)
+    # main branch     → stable release (after PR review + merge)
+    branches: [trainer, main]
     paths:
       - "datasets/**"
       - "config/model_config.yaml"
@@ -83,13 +84,18 @@ jobs:
           retention-days: 90
 
       - name: Create GitHub Release with weights
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "model-v${{ github.run_number }}"
           name: "Model weights – run ${{ github.run_number }}"
+          # Pre-release on trainer branch; stable on main or manual dispatch
+          prerelease: ${{ github.ref == 'refs/heads/trainer' }}
           body: |
-            Automatically trained on dataset commit ${{ github.sha }}.
+            **Branch:** `${{ github.ref_name }}`
+            **Commit:** ${{ github.sha }}
+            ${{ github.ref == 'refs/heads/trainer' && '> ⚠️ Pre-release — trained from trainer branch, pending review. Merge trainer → main to promote to stable.' || '✅ Stable release — promoted via merge to main.' }}
+
             Download `best.pt` for inference or `best.onnx` for deployment.
           files: |
             weights/best.pt
