@@ -1,14 +1,9 @@
 name: Train Scale Detection Model
 
 on:
-  push:
-    # trainer branch  → pre-release (dataset from annotation tool)
-    # main branch     → stable release (after PR review + merge)
-    branches: [trainer, main]
-    paths:
-      - "datasets/**"
-      - "config/model_config.yaml"
-  # Allow manual trigger with optional overrides
+  # Manual trigger for offline/developer training runs.
+  # Automated training is handled by the annotation server (POST /api/model/train),
+  # which runs ultralytics locally and publishes best.pt as a GitHub Release directly.
   workflow_dispatch:
     inputs:
       epochs:
@@ -84,17 +79,15 @@ jobs:
           retention-days: 90
 
       - name: Create GitHub Release with weights
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "model-v${{ github.run_number }}"
           name: "Model weights – run ${{ github.run_number }}"
-          # Pre-release on trainer branch; stable on main or manual dispatch
-          prerelease: ${{ github.ref == 'refs/heads/trainer' }}
+          prerelease: false
           body: |
-            **Branch:** `${{ github.ref_name }}`
+            **Triggered by:** manual `workflow_dispatch`
             **Commit:** ${{ github.sha }}
-            ${{ github.ref == 'refs/heads/trainer' && '> ⚠️ Pre-release — trained from trainer branch, pending review. Merge trainer → main to promote to stable.' || '✅ Stable release — promoted via merge to main.' }}
 
             Download `best.pt` for inference or `best.onnx` for deployment.
           files: |
