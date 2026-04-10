@@ -27,7 +27,7 @@ import yaml
 
 REPO_ROOT   = Path(__file__).parent
 CONFIG_PATH = REPO_ROOT / "config" / "model_config.yaml"
-DEFAULT_WEIGHTS = REPO_ROOT / "weights" / "best.pt"
+DEFAULT_WEIGHTS = REPO_ROOT / "weights" / "best.onnx"
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp", ".webp"}
 
@@ -75,7 +75,7 @@ def run_inference(args: argparse.Namespace) -> None:
     if not weights.exists():
         raise FileNotFoundError(
             f"Model weights not found at {weights}. "
-            "Run train.py first or provide --weights."
+            "Download best.onnx from the GitHub Releases page."
         )
 
     detector = ScaleDetector(
@@ -83,7 +83,6 @@ def run_inference(args: argparse.Namespace) -> None:
         conf_threshold = args.conf or ic["conf_threshold"],
         iou_threshold  = ic["iou_threshold"],
         imgsz          = ic["imgsz"],
-        device         = args.device or "",
     )
 
     images  = collect_images(Path(args.image))
@@ -128,13 +127,11 @@ def main() -> None:
     parser.add_argument("--image",   required=True,
                         help="Path to an image file or directory of images")
     parser.add_argument("--weights", default=None,
-                        help="Path to model weights (.pt). Defaults to weights/best.pt")
+                        help="Path to ONNX model weights (.onnx). Defaults to weights/best.onnx")
     parser.add_argument("--output",  default=None,
                         help="Output directory for annotated images or JSON")
     parser.add_argument("--conf",    type=float, default=None,
                         help="Confidence threshold override")
-    parser.add_argument("--device",  default="",
-                        help="Device override: 'cpu', 'cuda', 'cuda:0', etc.")
     parser.add_argument("--tile",    action="store_true",
                         help="Use tiled inference (recommended for large plats)")
     parser.add_argument("--json",    action="store_true",

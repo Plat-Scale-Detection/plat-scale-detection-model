@@ -1,9 +1,80 @@
 # plat-scale-detection-model
 
-YOLOv8-based object detection model that finds **graphical scale bars** on
-engineering plats.  Training data is produced by the companion
+Object detection model that finds **graphical scale bars** on engineering plats.
+Weights are trained by the companion
 [plat-scale-detection-trainer](https://github.com/Plat-Scale-Detection/plat-scale-detection-trainer)
-annotation tool.
+and published here as GitHub Release assets.
+
+**License:** Apache 2.0 — see [LICENSE](LICENSE).  
+**Author:** Justin Kumpe and contributors.
+
+> Training is handled entirely by the trainer repo. This repo contains only
+> what is needed to **run inference** using the published weights.
+
+---
+
+## Getting started
+
+### 1. Download weights
+
+Download `best.onnx` from the [latest GitHub Release](../../releases/latest)
+and place it at `weights/best.onnx`.
+
+```bash
+mkdir -p weights
+# then download best.onnx from the Releases page into weights/
+```
+
+### 2. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+Dependencies: `onnxruntime`, `opencv-python-headless`, `numpy`, `pyyaml` — all MIT/BSD licensed.  
+No PyTorch or Ultralytics required.
+
+### 3. Run inference
+
+```bash
+# Single image → annotated PNG in runs/inference/
+python inference.py --image plat.png
+
+# Directory of images
+python inference.py --image plats/ --output results/
+
+# Tiled inference (recommended for large high-res drawings)
+python inference.py --image large_plat.tiff --tile
+
+# JSON output
+python inference.py --image plat.png --json
+
+# Custom weights or confidence threshold
+python inference.py --image plat.png --weights weights/best.onnx --conf 0.4
+```
+
+### 4. Python API
+
+```python
+from model.detector import ScaleDetector
+
+detector = ScaleDetector("weights/best.onnx", conf_threshold=0.25)
+
+# Single image
+detections = detector.predict("plat.png")
+
+# Tiled inference for large plats
+detections = detector.predict_tiled("large_plat.tiff")
+
+# Each detection dict:
+# {
+#   "class_id": 0, "class_name": "graphical_scale",
+#   "confidence": 0.92,
+#   "x": 412, "y": 308, "width": 154, "height": 22,       # pixels
+#   "x_center_norm": 0.31, "y_center_norm": 0.18,          # normalised [0,1]
+#   "width_norm": 0.12, "height_norm": 0.02,
+# }
+```
 
 ---
 
@@ -12,93 +83,14 @@ annotation tool.
 ```
 plat-scale-detection-model/
 ├── config/
-│   └── model_config.yaml     # all hyper-parameters, paths, inference defaults
-├── datasets/
-│   └── latest/               # YOLO dataset pushed by the trainer (gitignored images)
+│   └── model_config.yaml   # inference defaults (conf, iou, imgsz, tiling)
 ├── model/
-│   └── detector.py           # ScaleDetector wrapper (single + tiled inference)
-├── scripts/
-│   ├── import_dataset.py     # import a ZIP or directory exported from the trainer
-│   └── evaluate.py           # run validation metrics on a trained model
-├── weights/                  # trained .pt / .onnx files (gitignored, stored as Releases)
-├── train.py                  # fine-tune YOLOv8 on the dataset
-├── inference.py              # detect scales on one image or a folder
-└── .github/workflows/
-    └── train.yml             # auto-trains when a new dataset is pushed
+│   └── detector.py         # ScaleDetector — ONNX-based inference wrapper
+├── weights/                # place best.onnx here (gitignored, from Releases)
+├── inference.py            # CLI: detect scales on one image or a folder
+├── requirements.txt        # onnxruntime, opencv, numpy, pyyaml
+└── LICENSE                 # Apache 2.0
 ```
-
----
-
-## Getting started
-
-### 1. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-> GPU recommended.  CPU training is supported but slow for large datasets.
-
-### 2. Import training data
-
-**Option A – from a ZIP downloaded from the trainer UI:**
-```bash
-python scripts/import_dataset.py --zip ~/Downloads/plat_scale_dataset.zip
-```
-
-**Option B – from a directory (or if the trainer pushed directly to this repo):**
-```bash
-python scripts/import_dataset.py --dir datasets/latest
-```
-
-### 3. Train
-
-```bash
-python train.py                          # uses config/model_config.yaml defaults
-python train.py --epochs 50              # override epochs
-python train.py --device cuda:0          # explicit GPU
-python train.py --resume                 # resume from last checkpoint
-```
-
-Best weights are saved to `weights/best.pt` and exported to `weights/best.onnx`.
-
-### 4. Evaluate
-
-```bash
-python scripts/evaluate.py
-```
-
-Prints mAP50, mAP50-95, precision, and recall on the validation split.
-
-### 5. Run inference
-
-```bash
-# Single image → annotated PNG in runs/inference/
-python inference.py --image plat.png
-
-# Directory of images → annotated PNGs
-python inference.py --image plats/ --output results/
-
-# Tiled inference (recommended for large high-res drawings)
-python inference.py --image large_plat.tiff --tile
-
-# JSON output instead of annotated images
-python inference.py --image plat.png --json
-```
-
----
-
-## Automated training (GitHub Actions)
-
-Pushing a new dataset to `datasets/` on the `main` branch (or using the
-**Push to GitHub** button in the trainer) automatically triggers the
-[`train.yml`](.github/workflows/train.yml) workflow, which:
-
-1. Validates the dataset.
-2. Fine-tunes YOLOv8 (CPU runner – swap for a self-hosted GPU runner for
-   production use).
-3. Uploads `weights/` as a GitHub Actions artifact.
-4. Creates a GitHub Release with `best.pt` and `best.onnx` attached.
 
 ---
 
@@ -109,13 +101,16 @@ Pushing a new dataset to `datasets/` on the `main` branch (or using the
 | Architecture | YOLOv8s (fine-tuned from COCO) |
 | Classes | 1 (`graphical_scale`) |
 | Input size | 1280 × 1280 |
-| Framework | Ultralytics · PyTorch |
-| Export formats | ONNX, TorchScript |
+| Inference runtime | ONNX Runtime (MIT) |
+| Weights format | ONNX (`.onnx`) |
 
-### Why YOLOv8?
+---
 
-Graphical scale bars are small, elongated objects.  YOLOv8's anchor-free
-detector with a large receptive field handles them well, and the Ultralytics
-library provides a single-command training + export pipeline.  The `s` variant
-strikes a good balance between accuracy and speed on CPU for deployment in
-scanning workflows.
+## Attribution
+
+If you use this model in your work, please credit:
+
+> **Justin Kumpe** — [Plat-Scale-Detection](https://github.com/Plat-Scale-Detection)
+
+
+---
